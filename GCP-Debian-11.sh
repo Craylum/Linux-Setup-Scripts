@@ -14,28 +14,32 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+# Setup repositories
+sudo find /etc/apt/sources.list.d -type f -exec sudo sed -i 's/http:/https:/g' {} \;
+sudo find /etc/apt/sources.list -type f -exec sudo sed -i 's/http:/https:/g' {} \;
+
+# Update packages
+sudo apt update
+sudo apt upgrade -y
+
 # Setup NTS
+sudo apt install chrony -y
 sudo rm -rf /etc/chrony/chrony.conf
 sudo curl https://raw.githubusercontent.com/GrapheneOS/infrastructure/main/chrony.conf -o /etc/chrony/chrony.conf
 sudo systemctl restart chronyd
-
-# Setup repositories
-sudo find /etc/apt/sources.list.d -type f -exec sudo sed -i 's/http:/https:/g' {} \;
-
-# Update and install packages
-sudo apt update
-sudo apt upgrade -y
 
 # Setup ufw
 sudo apt install ufw -y
 sudo ufw enable
 sudo ufw allow OpenSSH
+sudo ufw allow "WWW Full"
+sudo ufw allow 443/udp
 
 # Harden SSH
 echo 'GSSAPIAuthentication no
 VerifyHostKeyDNS yes' | sudo tee /etc/ssh/ssh_config.d/10-custom.conf
 sudo chmod 644 /etc/ssh/ssh_config.d/10-custom.conf
-sudo curl https://raw.githubusercontent.com/TommyTran732/Linux-Setup-Scripts/main/etc/ssh/sshd_config/10-custom.conf -o /etc/ssh/sshd_config.d/10-custom.conf
+sudo curl https://raw.githubusercontent.com/Craylum/Linux-Setup-Scripts/main/etc/ssh/sshd_config/10-custom.conf -o /etc/ssh/sshd_config.d/10-custom.conf
 sudo chmod 644 /etc/ssh/sshd_config.d/10-custom.conf
 sudo mkdir -p /etc/systemd/system/ssh.service.d
 sudo curl https://raw.githubusercontent.com/GrapheneOS/infrastructure/main/systemd/system/sshd.service.d/local.conf -o /etc/systemd/system/ssh.service.d/override.conf
@@ -43,7 +47,6 @@ sudo systemctl daemon-reload
 sudo systemctl restart sshd
 
 # Kernel Hardening
-
 sudo curl https://raw.githubusercontent.com/Kicksecure/security-misc/master/etc/modprobe.d/30_security-misc.conf -o /etc/modprobe.d/30_security-misc.conf
 sudo curl https://raw.githubusercontent.com/Kicksecure/security-misc/master/usr/lib/sysctl.d/990_security-misc.conf -o /etc/sysctl.d/990_security-misc.conf
 sudo sed -i 's/kernel.yama.ptrace_scope=2/kernel.yama.ptrace_scope=3/g' /etc/sysctl.d/990_security-misc.conf
@@ -55,15 +58,17 @@ sudo mkdir -p /etc/systemd/system/NetworkManager.service.d
 sudo curl https://gitlab.com/divested/brace/-/raw/master/brace/usr/lib/systemd/system/NetworkManager.service.d/99-brace.conf -o /etc/systemd/system/NetworkManager.service.d/99-brace.conf
 sudo sysctl -p
 
+# Redis & QUIC fixes
+sudo curl https://raw.githubusercontent.com/Craylum/Linux-Setup-Scripts/main/etc/sysctl/quic_redis.conf -o /etc/sysctl.d/quic_redis.conf
+
 # Rebuild initramfs
 sudo update-initramfs -u
 
 # Security limit
-echo "* hard core 0" | tee -a /etc/security/limits.conf
+echo "* hard core 0" | sudo tee -a /etc/security/limits.conf
 
 # Setup unbound
-
-sudo apt instal unbound resolvconf -y
+sudo apt install unbound resolvconf dns-root-data -y
 
 echo 'server:
   trust-anchor-signaling: yes
@@ -98,7 +103,7 @@ forward-zone:
   forward-addr: 2606:4700:4700::1112@853#security.cloudflare-dns.com
   forward-addr: 2606:4700:4700::1002@853#security.cloudflare-dns.com' | sudo tee /etc/unbound/unbound.conf.d/custom.conf
 
-mkdir -p /etc/systemd/system/unbound.service.d
+sudo mkdir -p /etc/systemd/system/unbound.service.d
 echo $'[Service]
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_SETGID CAP_SETUID CAP_SYS_CHROOT CAP_SYS_RESOURCE CAP_NET_RAW
 MemoryDenyWriteExecute=true
@@ -135,8 +140,8 @@ sudo systemctl restart unbound
 sudo systemctl disable --now systemd-resolved
 
 # Setup tuned
-sudo dnf install tuned -y
+sudo apt install tuned -y
 sudo tuned-adm profile virtual-guest
 
 # Enable fstrim.timer
-sudo ystemctl enable --now fstrim.timer
+sudo systemctl enable --now fstrim.timer
