@@ -16,17 +16,38 @@
 
 #Run this after GCP-Debian-11.sh
 
-# Install Docker
-sudo mkdir -m 0755 -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+# Add Docker's official GPG key:
 sudo apt update
-sudo apt -y --no-install-recommends install docker-ce
+sudo apt install ca-certificates curl gnupg -y
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
 
-# Install gVisor
-curl -fsSL https://gvisor.dev/archive.key | sudo gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main" | sudo tee /etc/apt/sources.list.d/gvisor.list > /dev/null
-sudo apt update 
-sudo apt -y --no-install-recommends install runsc
-sudo runsc install
+# Add the repository to Apt sources:
+echo \
+  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+
+# Install Docker and Docker Compose
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+
+# Fixes for user
+sudo groupadd docker
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Docker to start on boot
+sudo systemctl enable docker.service
+sudo systemctl enable containerd.service
+
+# Add IPV6 support to Docker (Change subnet to your liking)
+echo '{
+  "ipv6": true,
+  "fixed-cidr-v6": "fd96:4b11:22d6:1::/64",
+  "experimental": true,
+  "ip6tables": true
+}' | sudo tee /etc/docker/daemon.json
+
 sudo systemctl restart docker
