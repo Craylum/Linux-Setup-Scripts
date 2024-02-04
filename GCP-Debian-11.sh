@@ -14,7 +14,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-# Setup repositories
+# Make all repos https
 sudo find /etc/apt/sources.list.d -type f -exec sudo sed -i 's/http:/https:/g' {} \;
 sudo find /etc/apt/sources.list -type f -exec sudo sed -i 's/http:/https:/g' {} \;
 
@@ -30,10 +30,12 @@ sudo systemctl restart chronyd
 
 # Setup ufw
 sudo apt install ufw -y
-sudo ufw enable
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
 sudo ufw allow OpenSSH
 sudo ufw allow "WWW Full"
 sudo ufw allow 443/udp
+sudo ufw enable
 
 # Harden SSH
 echo 'GSSAPIAuthentication no
